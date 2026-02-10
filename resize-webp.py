@@ -17,6 +17,17 @@ SUPPORTED_EXTS = {".webp", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".g
 FILTER_STR = "Images (" + " ".join(f"*{e}" for e in sorted(SUPPORTED_EXTS)) + ")"
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resize-webp-config.json")
 
+WATERMARK_POSITIONS = [
+    "Top-left", "Top-center", "Top-right",
+    "Middle-left", "Center", "Middle-right",
+    "Bottom-left", "Bottom-center", "Bottom-right",
+]
+WM_POS_KEYS = [
+    "top-left", "top-center", "top-right",
+    "middle-left", "center", "middle-right",
+    "bottom-left", "bottom-center", "bottom-right",
+]
+
 
 def pil_to_qpixmap(pil_img, max_size=400):
     pil_img.thumbnail((max_size, max_size), Image.LANCZOS)
@@ -47,8 +58,8 @@ def save_config(cfg):
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(cfg, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[WARN] Failed to save config: {e}")
 
 
 def calc_resize(orig_w, orig_h, target_w, target_h, use_max_size, max_size):
@@ -63,13 +74,113 @@ def calc_resize(orig_w, orig_h, target_w, target_h, use_max_size, max_size):
     return target_w, target_h
 
 
+def apply_watermark(img, logo_img=None, text=None,
+                    position='bottom-right', logo_size_pct=20,
+                    font_size=24, opacity_pct=50, padding=10):
+    """Apply logo and/or text watermark to RGBA image. Returns new image."""
+    if not logo_img and not text:
+        return img
+
+    from PIL import ImageDraw, ImageFont
+
+    def _calc_anchor(element_w, element_h, img_w, img_h, position, padding):
+        """Return (x, y) for element placement."""
+        # Horizontal
+        if 'left' in position:
+            x = padding
+        elif 'right' in position:
+            x = img_w - element_w - padding
+        else:  # center
+            x = (img_w - element_w) // 2
+
+        # Vertical
+        if 'top' in position:
+            y = padding
+        elif 'bottom' in position:
+            y = img_h - element_h - padding
+        else:  # middle
+            y = (img_h - element_h) // 2
+
+        return max(0, x), max(0, y)
+
+    def _adjust_opacity(layer, opacity_pct):
+        """Multiply alpha channel by opacity percentage."""
+        r, g, b, a = layer.split()
+        a = a.point(lambda p: int(p * opacity_pct / 100))
+        return Image.merge("RGBA", (r, g, b, a))
+
+    # Process logo
+    logo_w = logo_h = 0
+    logo_resized = None
+    if logo_img:
+        # Resize logo proportionally
+        logo_w = max(1, int(img.width * logo_size_pct / 100))
+        ratio = logo_w / logo_img.width
+        logo_h = max(1, int(logo_img.height * ratio))
+        logo_resized = logo_img.resize((logo_w, logo_h), Image.LANCZOS)
+        # Adjust opacity
+        logo_resized = _adjust_opacity(logo_resized, opacity_pct)
+
+    # Process text
+    txt_w = txt_h = 0
+    txt_layer = None
+    font = None
+    if text:
+        # Try system font, fallback to default
+        try:
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except OSError:
+            try:
+                font = ImageFont.truetype("DejaVuSans.ttf", font_size)
+            except OSError:
+                font = ImageFont.load_default()
+        # Measure text
+        txt_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(txt_layer)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        txt_w = bbox[2] - bbox[0]
+        txt_h = bbox[3] - bbox[1]
+
+    # Composite watermarks
+    if logo_resized and text:
+        # Stack: logo on top, text below, 5px gap
+        total_h = logo_h + 5 + txt_h
+        total_w = max(logo_w, txt_w)
+        ax, ay = _calc_anchor(total_w, total_h, img.width, img.height, position, padding)
+        # Paste logo
+        logo_x = ax + (total_w - logo_w) // 2
+        img.paste(logo_resized, (logo_x, ay), logo_resized)
+        # Draw text
+        txt_x = ax + (total_w - txt_w) // 2
+        txt_y = ay + logo_h + 5
+        draw2 = ImageDraw.Draw(txt_layer)
+        draw2.text((txt_x, txt_y), text, font=font, fill=(255, 255, 255, 255))
+        txt_layer = _adjust_opacity(txt_layer, opacity_pct)
+        img = Image.alpha_composite(img, txt_layer)
+    elif logo_resized:
+        ax, ay = _calc_anchor(logo_w, logo_h, img.width, img.height, position, padding)
+        img.paste(logo_resized, (ax, ay), logo_resized)
+    elif text:
+        ax, ay = _calc_anchor(txt_w, txt_h, img.width, img.height, position, padding)
+        draw = ImageDraw.Draw(txt_layer)
+        draw.text((ax, ay), text, font=font, fill=(255, 255, 255, 255))
+        txt_layer = _adjust_opacity(txt_layer, opacity_pct)
+        img = Image.alpha_composite(img, txt_layer)
+
+    return img
+
+
 class ResizeWorker(QThread):
     progress = pyqtSignal(int)
     finished = pyqtSignal(int, int, int, int)
 
     def __init__(self, files, target_w, target_h, quality, output_dir,
                  same_as_input, use_max_size, max_size, rembg_fn=None,
-                 model_name="u2net", crop_pct=0):
+                 model_name="u2net", crop_pct=0,
+                 # Watermark params
+                 wm_logo_path=None, wm_text=None,
+                 wm_position='bottom-right', wm_logo_size_pct=20,
+                 wm_font_size=24, wm_opacity_pct=50, wm_padding=10):
         super().__init__()
         self.files = files
         self.target_w = target_w
@@ -82,6 +193,17 @@ class ResizeWorker(QThread):
         self.rembg_fn = rembg_fn
         self.model_name = model_name
         self.crop_pct = crop_pct
+        self.wm_logo_path = wm_logo_path
+        self.wm_text = wm_text
+        self.wm_position = wm_position
+        self.wm_logo_size_pct = wm_logo_size_pct
+        self.wm_font_size = wm_font_size
+        self.wm_opacity_pct = wm_opacity_pct
+        self.wm_padding = wm_padding
+        self._stop_requested = False
+
+    def stop(self):
+        self._stop_requested = True
 
     def run(self):
         session = None
@@ -89,8 +211,21 @@ class ResizeWorker(QThread):
             from rembg import new_session
             print(f"[INFO] Loading model: {self.model_name}...")
             session = new_session(self.model_name)
+
+        # Cache logo for batch
+        wm_logo_img = None
+        if self.wm_logo_path:
+            try:
+                wm_logo_img = Image.open(self.wm_logo_path).convert("RGBA")
+                print(f"[INFO] Logo loaded: {self.wm_logo_path}")
+            except Exception as e:
+                print(f"[WARN] Cannot load logo: {e}")
+
         ok, fail, total_before, total_after = 0, 0, 0, 0
         for i, path in enumerate(self.files):
+            if self._stop_requested:
+                print("[INFO] Processing stopped by user")
+                break
             print(f"[INFO] Processing {os.path.basename(path)}...")
             try:
                 total_before += os.path.getsize(path)
@@ -102,6 +237,18 @@ class ResizeWorker(QThread):
                     dx = int(cw * self.crop_pct / 200)
                     dy = int(ch * self.crop_pct / 200)
                     img = img.crop((dx, dy, cw - dx, ch - dy))
+
+                # Apply watermark (before resize)
+                if wm_logo_img or self.wm_text:
+                    img = apply_watermark(
+                        img, logo_img=wm_logo_img, text=self.wm_text,
+                        position=self.wm_position,
+                        logo_size_pct=self.wm_logo_size_pct,
+                        font_size=self.wm_font_size,
+                        opacity_pct=self.wm_opacity_pct,
+                        padding=self.wm_padding,
+                    )
+
                 w, h = calc_resize(img.width, img.height,
                                    self.target_w, self.target_h,
                                    self.use_max_size, self.max_size)
@@ -146,6 +293,7 @@ class MainWindow(QMainWindow):
         self.updating_spinbox = False
         self.cfg = load_config()
         self._rembg_remove = None
+        self.worker = None
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -286,6 +434,124 @@ class MainWindow(QMainWindow):
         rembg_layout.addWidget(self.combo_model, 1)
         right.addLayout(rembg_layout)
 
+        # Watermark group
+        wm_group = QGroupBox("Watermark")
+        wm_layout = QVBoxLayout(wm_group)
+
+        # Logo controls
+        self.chk_logo = QCheckBox("Logo anh")
+        wm_layout.addWidget(self.chk_logo)
+
+        logo_path_layout = QHBoxLayout()
+        self.logo_path_edit = QLineEdit()
+        self.logo_path_edit.setReadOnly(True)
+        self.logo_path_edit.setPlaceholderText("Chọn file logo...")
+        self.btn_logo_browse = QPushButton("Chon...")
+        self.btn_logo_clear = QPushButton("Clear")
+        self.btn_logo_browse.clicked.connect(self._select_logo)
+        self.btn_logo_clear.clicked.connect(self._clear_logo)
+        logo_path_layout.addWidget(self.logo_path_edit, 1)
+        logo_path_layout.addWidget(self.btn_logo_browse)
+        logo_path_layout.addWidget(self.btn_logo_clear)
+        wm_layout.addLayout(logo_path_layout)
+
+        logo_size_layout = QHBoxLayout()
+        logo_size_layout.addWidget(QLabel("Size:"))
+        self.logo_size_slider = QSlider(Qt.Horizontal)
+        self.logo_size_slider.setRange(5, 80)
+        self.logo_size_slider.setValue(20)
+        self.logo_size_label = QLabel("20%")
+        self.logo_size_slider.valueChanged.connect(lambda v: self.logo_size_label.setText(f"{v}%"))
+        logo_size_layout.addWidget(self.logo_size_slider, 1)
+        logo_size_layout.addWidget(self.logo_size_label)
+        wm_layout.addLayout(logo_size_layout)
+
+        # Text watermark controls
+        self.chk_text_wm = QCheckBox("Text watermark")
+        wm_layout.addWidget(self.chk_text_wm)
+
+        text_edit_layout = QHBoxLayout()
+        text_edit_layout.addWidget(QLabel("Text:"))
+        self.wm_text_edit = QLineEdit()
+        self.wm_text_edit.setPlaceholderText("Nhap text watermark...")
+        text_edit_layout.addWidget(self.wm_text_edit, 1)
+        wm_layout.addLayout(text_edit_layout)
+
+        font_size_layout = QHBoxLayout()
+        font_size_layout.addWidget(QLabel("Font size:"))
+        self.spin_font_size = QSpinBox()
+        self.spin_font_size.setRange(8, 200)
+        self.spin_font_size.setValue(24)
+        font_size_layout.addWidget(self.spin_font_size, 1)
+        wm_layout.addLayout(font_size_layout)
+
+        # Shared controls
+        position_layout = QHBoxLayout()
+        position_layout.addWidget(QLabel("Vi tri:"))
+        self.combo_wm_position = QComboBox()
+        self.combo_wm_position.addItems(WATERMARK_POSITIONS)
+        self.combo_wm_position.setCurrentIndex(8)  # Default: bottom-right
+        position_layout.addWidget(self.combo_wm_position, 1)
+        wm_layout.addLayout(position_layout)
+
+        opacity_layout = QHBoxLayout()
+        opacity_layout.addWidget(QLabel("Opacity:"))
+        self.opacity_slider = QSlider(Qt.Horizontal)
+        self.opacity_slider.setRange(1, 100)
+        self.opacity_slider.setValue(50)
+        self.opacity_label = QLabel("50%")
+        self.opacity_slider.valueChanged.connect(lambda v: self.opacity_label.setText(f"{v}%"))
+        opacity_layout.addWidget(self.opacity_slider, 1)
+        opacity_layout.addWidget(self.opacity_label)
+        wm_layout.addLayout(opacity_layout)
+
+        padding_layout = QHBoxLayout()
+        padding_layout.addWidget(QLabel("Padding:"))
+        self.spin_wm_padding = QSpinBox()
+        self.spin_wm_padding.setRange(0, 500)
+        self.spin_wm_padding.setValue(10)
+        self.spin_wm_padding.setSuffix("px")
+        padding_layout.addWidget(self.spin_wm_padding, 1)
+        wm_layout.addLayout(padding_layout)
+
+        # Wire toggle signals
+        self.chk_logo.toggled.connect(self._toggle_logo_controls)
+        self.chk_text_wm.toggled.connect(self._toggle_text_controls)
+
+        # Connect change signals to save config
+        self.chk_logo.toggled.connect(self._save_wm_config)
+        self.logo_size_slider.valueChanged.connect(self._save_wm_config)
+        self.chk_text_wm.toggled.connect(self._save_wm_config)
+        self.wm_text_edit.textChanged.connect(self._save_wm_config)
+        self.spin_font_size.valueChanged.connect(self._save_wm_config)
+        self.combo_wm_position.currentIndexChanged.connect(self._save_wm_config)
+        self.opacity_slider.valueChanged.connect(self._save_wm_config)
+        self.spin_wm_padding.valueChanged.connect(self._save_wm_config)
+
+        # Restore watermark settings from config
+        self.chk_logo.setChecked(self.cfg.get("wm_logo_enabled", False))
+        logo_path = self.cfg.get("wm_logo_path", "")
+        if logo_path and os.path.isfile(logo_path):
+            self.logo_path_edit.setText(logo_path)
+        self.logo_size_slider.setValue(self.cfg.get("wm_logo_size_pct", 20))
+
+        self.chk_text_wm.setChecked(self.cfg.get("wm_text_enabled", False))
+        self.wm_text_edit.setText(self.cfg.get("wm_text_content", ""))
+        self.spin_font_size.setValue(self.cfg.get("wm_font_size", 24))
+
+        pos_key = self.cfg.get("wm_position", "bottom-right")
+        pos_idx = WM_POS_KEYS.index(pos_key) if pos_key in WM_POS_KEYS else 8
+        self.combo_wm_position.setCurrentIndex(pos_idx)
+
+        self.opacity_slider.setValue(self.cfg.get("wm_opacity", 50))
+        self.spin_wm_padding.setValue(self.cfg.get("wm_padding", 10))
+
+        # Initial disabled state (after config load)
+        self._toggle_logo_controls(self.chk_logo.isChecked())
+        self._toggle_text_controls(self.chk_text_wm.isChecked())
+
+        right.addWidget(wm_group)
+
         # Progress + button
         self.progress = QProgressBar()
         self.progress.setVisible(False)
@@ -403,6 +669,54 @@ class MainWindow(QMainWindow):
             return [self.files[i] for i in indices]
         return list(self.files)
 
+    def _toggle_logo_controls(self, enabled):
+        self.logo_path_edit.setEnabled(enabled)
+        self.btn_logo_browse.setEnabled(enabled)
+        self.btn_logo_clear.setEnabled(enabled)
+        self.logo_size_slider.setEnabled(enabled)
+
+    def _toggle_text_controls(self, enabled):
+        self.wm_text_edit.setEnabled(enabled)
+        self.spin_font_size.setEnabled(enabled)
+
+    def _select_logo(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Chon logo", "",
+            "Images (*.png *.webp *.jpg *.jpeg)"
+        )
+        if path:
+            # Validate path security
+            if not os.path.isfile(path):
+                QMessageBox.warning(self, "Lỗi", "File không tồn tại!")
+                return
+            # Check file size (max 10MB for logos)
+            try:
+                file_size = os.path.getsize(path)
+                if file_size > 10 * 1024 * 1024:
+                    QMessageBox.warning(self, "Lỗi", "Logo quá lớn! Tối đa 10MB.")
+                    return
+            except OSError:
+                QMessageBox.warning(self, "Lỗi", "Không thể đọc file!")
+                return
+            self.logo_path_edit.setText(path)
+            self._save_wm_config()
+
+    def _clear_logo(self):
+        self.logo_path_edit.setText("")
+        self._save_wm_config()
+
+    def _save_wm_config(self):
+        self.cfg["wm_logo_enabled"] = self.chk_logo.isChecked()
+        self.cfg["wm_logo_path"] = self.logo_path_edit.text()
+        self.cfg["wm_logo_size_pct"] = self.logo_size_slider.value()
+        self.cfg["wm_text_enabled"] = self.chk_text_wm.isChecked()
+        self.cfg["wm_text_content"] = self.wm_text_edit.text()
+        self.cfg["wm_font_size"] = self.spin_font_size.value()
+        self.cfg["wm_position"] = WM_POS_KEYS[self.combo_wm_position.currentIndex()]
+        self.cfg["wm_opacity"] = self.opacity_slider.value()
+        self.cfg["wm_padding"] = self.spin_wm_padding.value()
+        save_config(self.cfg)
+
     def start_resize(self):
         files = self.get_selected_files()
         if not files:
@@ -426,6 +740,17 @@ class MainWindow(QMainWindow):
                     "Chạy: pip install \"rembg[gpu]\" hoặc \"rembg[cpu]\"")
                 return
 
+        # Gather watermark params
+        wm_logo_path = None
+        wm_text = None
+        if self.chk_logo.isChecked() and self.logo_path_edit.text().strip():
+            wm_logo_path = self.logo_path_edit.text().strip()
+        if self.chk_text_wm.isChecked() and self.wm_text_edit.text().strip():
+            wm_text = self.wm_text_edit.text().strip()
+
+        wm_pos_idx = self.combo_wm_position.currentIndex()
+        wm_position = WM_POS_KEYS[wm_pos_idx] if 0 <= wm_pos_idx < len(WM_POS_KEYS) else "bottom-right"
+
         self.btn_resize.setEnabled(False)
         self.progress.setVisible(True)
         self.progress.setMaximum(len(files))
@@ -436,10 +761,27 @@ class MainWindow(QMainWindow):
             self.quality_slider.value(), output_dir, same_as_input,
             use_max, self.spin_max.value(), rembg_fn,
             self.combo_model.currentText(), self.spin_crop.value(),
+            # Watermark params
+            wm_logo_path=wm_logo_path,
+            wm_text=wm_text,
+            wm_position=wm_position,
+            wm_logo_size_pct=self.logo_size_slider.value(),
+            wm_font_size=self.spin_font_size.value(),
+            wm_opacity_pct=self.opacity_slider.value(),
+            wm_padding=self.spin_wm_padding.value(),
         )
         self.worker.progress.connect(self.progress.setValue)
         self.worker.finished.connect(self.on_resize_done)
         self.worker.start()
+
+    def closeEvent(self, event):
+        """Handle window close - stop worker if running."""
+        if self.worker and self.worker.isRunning():
+            self.worker.stop()
+            self.worker.wait(3000)  # Wait up to 3 seconds
+            if self.worker.isRunning():
+                self.worker.terminate()
+        event.accept()
 
     def on_resize_done(self, ok, fail, total_before, total_after):
         self.btn_resize.setEnabled(True)
