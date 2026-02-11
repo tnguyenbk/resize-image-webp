@@ -1,13 +1,13 @@
 # Project Overview - Product Development Requirements
 
 **Project Name**: Image Resize WebP
-**Version**: 1.1.0
-**Last Updated**: 2026-02-10
-**Status**: Production-ready with watermark feature
+**Version**: 1.2.0
+**Last Updated**: 2026-02-11
+**Status**: Production-ready with enhanced UI and advanced watermark features
 
 ## Executive Summary
 
-Image Resize WebP is a desktop application built with PyQt5 for batch processing images with background removal, intelligent cropping, resizing, format conversion, and professional watermarking capabilities. The application targets photographers, e-commerce sellers, and content creators who need efficient batch image processing with branding features.
+Image Resize WebP is a desktop application built with PyQt5 for batch processing images with background removal, intelligent cropping, resizing, format conversion, and professional watermarking capabilities. The application features a 3-column UI layout with independent logo and text watermark controls, including rotation and tiling features. It targets photographers, e-commerce sellers, and content creators who need efficient batch image processing with advanced branding features.
 
 ## Product Vision
 
@@ -46,22 +46,28 @@ Provide a user-friendly, performant desktop tool for bulk image processing with 
 - **FR4.5**: Configurable target height (default: 1500px)
 - **FR4.6**: Use high-quality LANCZOS resampling
 
-### FR5: Watermark (v1.1.0)
-- **FR5.1**: Logo watermarking
+### FR5: Watermark (v1.2.0 - Enhanced)
+- **FR5.1**: Logo watermarking (independent controls)
   - Enable/disable logo via checkbox
   - Select logo file (PNG, WEBP, JPG, JPEG)
   - Configure logo size (5-80% of image width)
+  - Independent position selection: 9-position grid
+  - Independent opacity slider (1-100%)
+  - Independent edge padding (0-500px)
   - Clear logo path
-- **FR5.2**: Text watermarking
+- **FR5.2**: Text watermarking (independent controls)
   - Enable/disable text via checkbox
   - Enter custom watermark text
   - Configure font size (8-200px)
-- **FR5.3**: Shared watermark controls
-  - Position selection: 9-position grid (top-left to bottom-right)
-  - Opacity slider (1-100%)
-  - Edge padding (0-500px)
-- **FR5.4**: Stacking behavior
-  - Logo + text at same position: Stack vertically (logo on top, 5px gap)
+  - Independent position selection: 9-position grid
+  - Independent opacity slider (1-100%)
+  - Independent edge padding (0-500px)
+  - Text rotation (0-360 degrees)
+  - Tiling mode (repeat across entire image)
+- **FR5.3**: Logo and text independence
+  - Logo and text can be placed at different positions
+  - Logo and text have separate opacity and padding controls
+  - No stacking behavior (fully independent positioning)
 
 ### FR6: Output Settings
 - **FR6.1**: Save as WebP format
@@ -80,16 +86,26 @@ Provide a user-friendly, performant desktop tool for bulk image processing with 
 - **FR8.1**: Auto-save last selected input folder
 - **FR8.2**: Auto-save last selected output folder
 - **FR8.3**: Auto-save rembg model selection
-- **FR8.4**: Auto-save all watermark settings (9 keys)
+- **FR8.4**: Auto-save all watermark settings (14 keys)
 - **FR8.5**: Config file: `resize-webp-config.json`
 - **FR8.6**: Validate and restore settings on app startup
+- **FR8.7**: Config type and range validation for security
 
-### FR9: Image Preview
-- **FR9.1**: Display selected image in left panel
-- **FR9.2**: Show image filename
-- **FR9.3**: Show image dimensions (WxH)
-- **FR9.4**: Show file size (formatted)
-- **FR9.5**: Thumbnail max size: 400px
+### FR9: UI Layout (v1.2.0)
+- **FR9.1**: 3-column responsive layout
+  - Column 1: File list and selection controls
+  - Column 2: Preview, image info, and basic processing controls
+  - Column 3: Logo and text watermark sections (independent)
+- **FR9.2**: Minimum window size: 1100x600 pixels
+- **FR9.3**: Preview panel with image thumbnail (max 400px)
+- **FR9.4**: Grouped controls using QGroupBox for clarity
+
+### FR10: Image Preview
+- **FR10.1**: Display selected image in preview panel
+- **FR10.2**: Show image filename
+- **FR10.3**: Show image dimensions (WxH)
+- **FR10.4**: Show file size (formatted)
+- **FR10.5**: Thumbnail max size: 400px
 
 ## Non-Functional Requirements
 
@@ -100,11 +116,13 @@ Provide a user-friendly, performant desktop tool for bulk image processing with 
 - **NFR1.4**: Memory usage under 2GB for 500 image batches
 
 ### NFR2: Usability
-- **NFR2.1**: Single-window interface, no popups during normal flow
+- **NFR2.1**: 3-column interface for organized workflow
 - **NFR2.2**: Clear labels in Vietnamese (target audience)
-- **NFR2.3**: Intuitive control grouping (folders, processing, output)
-- **NFR2.4**: Immediate visual feedback (preview, progress bar)
-- **NFR2.5**: Settings persist across restarts (no re-configuration)
+- **NFR2.3**: Intuitive control grouping (file list, processing, watermarks)
+- **NFR2.4**: Independent logo and text watermark controls
+- **NFR2.5**: Immediate visual feedback (preview, progress bar)
+- **NFR2.6**: Settings persist across restarts (no re-configuration)
+- **NFR2.7**: Minimum window size 1100x600 for comfortable use
 
 ### NFR3: Reliability
 - **NFR3.1**: Handle corrupted images gracefully (log error, skip file)
@@ -116,16 +134,20 @@ Provide a user-friendly, performant desktop tool for bulk image processing with 
 ### NFR4: Security
 - **NFR4.1**: Validate logo file paths (no directory traversal)
 - **NFR4.2**: Enforce logo file size limit (10MB max)
-- **NFR4.3**: Validate file types against whitelist
-- **NFR4.4**: Sanitize paths before saving to config
-- **NFR4.5**: No arbitrary code execution from config files
+- **NFR4.3**: Enforce input image file size limit (100MB max)
+- **NFR4.4**: Validate file types against whitelist
+- **NFR4.5**: Sanitize paths before saving to config
+- **NFR4.6**: Config type and range validation to prevent injection
+- **NFR4.7**: No arbitrary code execution from config files
+- **NFR4.8**: Worker thread guards against restart memory leaks
 
 ### NFR5: Maintainability
-- **NFR5.1**: Single-file application (resize-webp.py)
+- **NFR5.1**: Single-file application (resize-webp.py, ~976 LOC)
 - **NFR5.2**: Pure functions for core logic (e.g., `apply_watermark()`)
 - **NFR5.3**: Clear separation: UI layer, logic layer, worker layer
 - **NFR5.4**: Comprehensive inline comments
 - **NFR5.5**: Unit tests for critical functions
+- **NFR5.6**: Safe config loading with validation helpers
 
 ### NFR6: Compatibility
 - **NFR6.1**: Python 3.7+ support
@@ -147,7 +169,7 @@ Provide a user-friendly, performant desktop tool for bulk image processing with 
 - **Disk**: 500MB for rembg models, variable for image storage
 
 ### TC3: File Size Limits
-- Input images: No hard limit (tested up to 50MB)
+- Input images: 100MB maximum (security protection)
 - Logo files: 10MB maximum
 - Output WebP: Variable (depends on quality setting)
 
@@ -162,14 +184,16 @@ Provide a user-friendly, performant desktop tool for bulk image processing with 
 - Output folder contains 10 WebP files with watermarks
 - All settings restored after app restart
 
-### AC2: Watermark Feature (v1.1.0)
+### AC2: Watermark Feature (v1.2.0)
 - User selects logo file (PNG, 2MB)
-- User sets logo size to 20%, position bottom-right, opacity 70%
+- User sets logo position to bottom-right, size 20%, opacity 70%, padding 20px
 - User enables text watermark "© 2026 Brand"
+- User sets text position to top-center, opacity 80%, padding 10px, rotation 45°
+- User enables text tiling mode
 - User processes 50 images
-- All output images show logo + text correctly positioned
+- All output images show logo at bottom-right and tiled text at specified rotation
 - Logo loaded only once (verified in logs)
-- Settings persist after restart
+- Settings persist after restart with correct values
 
 ### AC3: Error Handling
 - User selects invalid logo path → Warning shown, watermark skipped
@@ -195,61 +219,78 @@ Provide a user-friendly, performant desktop tool for bulk image processing with 
 
 ## Development Phases
 
-### Phase 1: UI Components (Completed)
+### Phase 1: Logo Watermark Feature (v1.1.0 - Completed)
 - Added watermark UI controls to right panel
-- Checkbox toggles, file picker, sliders, spinboxes
-- **Effort**: 1 hour
-
-### Phase 2: Helper Function (Completed)
 - Implemented `apply_watermark()` pure function
-- Position calculation, opacity adjustment, stacking logic
-- **Effort**: 1 hour
+- Worker integration with logo caching
+- Config persistence for 9 watermark settings
+- **Effort**: 3 hours
 
-### Phase 3: Worker Integration (Completed)
-- Extended ResizeWorker with watermark parameters
-- Logo caching, pipeline integration
-- **Effort**: 30 minutes
+### Phase 2: UI Redesign & Enhanced Watermarks (v1.2.0 - Completed)
+- Restructured from 2-column to 3-column layout
+- Separated logo and text watermark controls (independent)
+- Added text rotation (0-360 degrees)
+- Added text tiling mode
+- Added config validation helpers (`safe_config_int`, `safe_config_str`)
+- Added file size limits for security
+- Added worker restart guards
+- **Effort**: 6 hours
 
-### Phase 4: Config Persistence (Completed)
-- Added 9 watermark config keys
-- Auto-save on all control changes
-- **Effort**: 30 minutes
-
-**Total Development Time**: 3 hours (as estimated)
+**Total Development Time**: 9 hours
 
 ## Risk Assessment
 
 ### High Risks (Mitigated)
-- **R1**: UI crowding in right panel → Mitigated with organized QGroupBox layout
+- **R1**: UI crowding in right panel → Mitigated with 3-column layout
 - **R2**: Font not found → Mitigated with fallback chain (arial → DejaVuSans → default)
 - **R3**: Thread safety → Mitigated with read-only logo cache
+- **R4**: Config corruption → Mitigated with type validation helpers
+- **R5**: File size bombs → Mitigated with 100MB input limit
 
 ### Medium Risks (Monitored)
-- **R4**: Large logo files slow processing → 10MB limit enforced, performance warning could be added
-- **R5**: Non-ASCII text rendering → Pillow handles Unicode, font coverage varies (acceptable for v1)
+- **R6**: Large logo files slow processing → 10MB limit enforced
+- **R7**: Non-ASCII text rendering → Pillow handles Unicode, font coverage varies
+- **R8**: Window too wide for small screens → 1100px minimum may exclude 1024x768 users
 
 ### Low Risks (Accepted)
-- **R6**: Config file corruption → Reset to defaults on load error
-- **R7**: Frequent config writes → Acceptable for small JSON file (could add debounce in v2)
+- **R9**: Config file write frequency → Acceptable for small JSON file
+- **R10**: Single-file LOC count (976) → Acceptable for desktop app, modularization planned for v2
 
 ## Future Roadmap (V2.0)
 
 ### Planned Features
-1. Multiple watermark layers (stack multiple logos/texts)
-2. Logo rotation support (-180° to +180°)
-3. Text color picker (currently white only)
-4. Watermark templates (save/load presets)
-5. Drag-and-drop logo positioning with live preview
-6. Advanced text effects (outline, shadow, gradient)
-7. Batch mode: Different watermarks per image based on filename pattern
+1. Config save debouncing to prevent write race conditions
+2. PIL image cleanup with context managers
+3. Multiple watermark layers (stack multiple logos/texts)
+4. Logo rotation support (-180° to +180°)
+5. Text color picker (currently white only)
+6. Watermark templates (save/load presets)
+7. Drag-and-drop logo positioning with live preview
+8. Advanced text effects (outline, shadow, gradient)
+9. Batch mode: Different watermarks per image based on filename pattern
+10. Scrollable UI for small screens (1024x768 support)
 
 ### Planned Improvements
 1. Performance optimization: Logo resize caching
 2. UI improvements: Watermark preview before processing
 3. Export settings: Share config with team members
-4. Logging: Detailed processing logs for debugging
+4. Detailed processing logs for debugging
+5. Better font fallback with explicit system paths
+6. Worker stop timeout validation
 
 ## Version History
+
+### v1.2.0 (2026-02-11)
+- Restructured UI from 2-column to 3-column layout (1100x600 minimum)
+- Separated logo and text watermark controls (fully independent)
+- Added independent position, opacity, and padding for logo and text
+- Added text rotation (0-360 degrees)
+- Added text tiling mode (repeat across image)
+- Added config validation helpers (`safe_config_int`, `safe_config_str`)
+- Added file size limit for input images (100MB max)
+- Added worker restart guard to prevent memory leaks
+- Enhanced security with config type validation
+- Config schema extended to 14 watermark keys
 
 ### v1.1.0 (2026-02-10)
 - Added logo watermarking feature

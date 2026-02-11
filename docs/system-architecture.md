@@ -1,37 +1,50 @@
 # System Architecture
 
-**Last Updated**: 2026-02-10
-**Version**: 1.1.0 (Watermark Feature)
+**Last Updated**: 2026-02-11
+**Version**: 1.2.0 (UI Redesign & Enhanced Watermarks)
 
 ## Overview
 
-Image Resize WebP is a desktop application built on a three-layer architecture with multi-threaded processing. The system separates concerns into presentation (PyQt5 UI), business logic (image processing), and data persistence (JSON config).
+Image Resize WebP is a desktop application built on a three-layer architecture with multi-threaded processing. The system features a modern 3-column UI layout with independent logo and text watermark controls, including rotation and tiling capabilities. The architecture separates concerns into presentation (PyQt5 UI), business logic (image processing), and data persistence (JSON config with validation).
 
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Main Thread                              │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                     MainWindow (UI)                        │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐  │  │
-│  │  │ Left Panel  │  │ Right Panel │  │  Bottom Panel    │  │  │
-│  │  │ - Preview   │  │ - Folders   │  │  - Progress Bar  │  │  │
-│  │  │ - Info      │  │ - Rembg     │  │  - Start Button  │  │  │
-│  │  │             │  │ - Crop      │  │                  │  │  │
-│  │  │             │  │ - Resize    │  │                  │  │  │
-│  │  │             │  │ - Watermark │  │                  │  │  │
-│  │  │             │  │ - Output    │  │                  │  │  │
-│  │  └─────────────┘  └─────────────┘  └──────────────────┘  │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                              │                                   │
-│                              │ Signals (progress, finished)      │
-│                              ▼                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │               Config Manager (JSON I/O)                    │  │
-│  │  - load_config()  - save_config()  - _save_wm_config()    │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Main Thread                                         │
+│  ┌───────────────────────────────────────────────────────────────────────────┐  │
+│  │                     MainWindow (3-Column UI)                              │  │
+│  │  ┌──────────────┐  ┌──────────────────────┐  ┌──────────────────────┐   │  │
+│  │  │ Column 1     │  │ Column 2             │  │ Column 3             │   │  │
+│  │  │ (File List)  │  │ (Preview + Basic)    │  │ (Watermarks)         │   │  │
+│  │  │              │  │                      │  │                      │   │  │
+│  │  │ - File       │  │ - Preview Label      │  │ - Logo Section       │   │  │
+│  │  │   buttons    │  │ - Info Label         │  │   * Enable checkbox  │   │  │
+│  │  │ - File list  │  │ - Output folder      │  │   * Position (indep) │   │  │
+│  │  │   widget     │  │ - Size controls      │  │   * Opacity (indep)  │   │  │
+│  │  │ - Selection  │  │ - Crop border        │  │   * Size % slider    │   │  │
+│  │  │   hint       │  │ - Quality slider     │  │   * Padding (indep)  │   │  │
+│  │  │              │  │ - Rembg controls     │  │                      │   │  │
+│  │  │              │  │ - Progress bar       │  │ - Text Section       │   │  │
+│  │  │              │  │ - Convert button     │  │   * Enable checkbox  │   │  │
+│  │  │              │  │                      │  │   * Text input       │   │  │
+│  │  │              │  │                      │  │   * Position (indep) │   │  │
+│  │  │              │  │                      │  │   * Opacity (indep)  │   │  │
+│  │  │              │  │                      │  │   * Font size        │   │  │
+│  │  │              │  │                      │  │   * Padding (indep)  │   │  │
+│  │  │              │  │                      │  │   * Rotation (NEW)   │   │  │
+│  │  │              │  │                      │  │   * Tiling (NEW)     │   │  │
+│  │  └──────────────┘  └──────────────────────┘  └──────────────────────┘   │  │
+│  └───────────────────────────────────────────────────────────────────────────┘  │
+│                              │                                                   │
+│                              │ Signals (progress, finished)                      │
+│                              ▼                                                   │
+│  ┌───────────────────────────────────────────────────────────────────────────┐  │
+│  │         Config Manager (JSON I/O with Validation)                         │  │
+│  │  - load_config()  - save_config()                                         │  │
+│  │  - safe_config_int()  - safe_config_str()  ← NEW                          │  │
+│  └───────────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────────┘
                                 │
                                 │ Start Processing
                                 ▼
@@ -44,7 +57,11 @@ Image Resize WebP is a desktop application built on a three-layer architecture w
 │  │  │  1. Load Image (PIL.Image.open)                      │  │  │
 │  │  │  2. Rembg (optional)                                 │  │  │
 │  │  │  3. Auto-Crop (optional)                             │  │  │
-│  │  │  4. Watermark (apply_watermark) ← NEW v1.1.0         │  │  │
+│  │  │  4. Watermark (apply_watermark) ← v1.2.0 Enhanced    │  │  │
+│  │  │     - Independent logo positioning                   │  │  │
+│  │  │     - Independent text positioning                   │  │  │
+│  │  │     - Text rotation (0-360°)                         │  │  │
+│  │  │     - Text tiling mode                               │  │  │
 │  │  │  5. Resize (W/H/W+H modes)                           │  │  │
 │  │  │  6. Save WebP                                        │  │  │
 │  │  └─────────────────────────────────────────────────────┘  │  │
@@ -52,6 +69,10 @@ Image Resize WebP is a desktop application built on a three-layer architecture w
 │  │  ┌─────────────────────────────────────────────────────┐  │  │
 │  │  │           Watermark Module (Pure Functions)          │  │  │
 │  │  │  - apply_watermark(img, logo, text, ...)            │  │  │
+│  │  │    * Independent logo controls (position, size,     │  │  │
+│  │  │      opacity, padding)                              │  │  │
+│  │  │    * Independent text controls (position, font,     │  │  │
+│  │  │      opacity, padding, rotation, tiling)            │  │  │
 │  │  │  - _calc_anchor(size, position, padding)            │  │  │
 │  │  │  - _adjust_opacity(img, opacity_pct)                │  │  │
 │  │  └─────────────────────────────────────────────────────┘  │  │
@@ -87,52 +108,59 @@ Image Resize WebP is a desktop application built on a three-layer architecture w
 **Key Components:**
 
 ```
-MainWindow
-├── Left Panel (QWidget)
-│   ├── preview_label: QLabel (displays thumbnail)
-│   ├── preview_list: QListWidget (file list)
-│   └── Info labels: filename, dimensions, file size
+MainWindow (3-Column Layout)
+├── Column 1: File List (QWidget)
+│   ├── btn_add_files: QPushButton
+│   ├── btn_add_folder: QPushButton
+│   ├── btn_clear: QPushButton
+│   ├── file_list: QListWidget (multi-select)
+│   └── hint_label: QLabel
 │
-├── Right Panel (QWidget)
-│   ├── Folder Group (QGroupBox)
-│   │   ├── input_dir: QLineEdit + QPushButton
+├── Column 2: Preview + Basic Controls (QWidget)
+│   ├── preview_label: QLabel (400x280 min)
+│   ├── info_label: QLabel (filename, dimensions, size)
+│   │
+│   ├── Output Group (QGroupBox)
 │   │   └── output_dir: QLineEdit + QPushButton
+│   │
+│   ├── Size Group (QGroupBox)
+│   │   ├── radio_max_size / radio_exact: QRadioButton
+│   │   ├── spin_max_size / spin_width / spin_height: QSpinBox
+│   │   └── chk_keep_aspect: QCheckBox
+│   │
+│   ├── Crop Border Group (QGroupBox)
+│   │   └── spin_crop_border: QSpinBox
+│   │
+│   ├── Quality Group (QGroupBox)
+│   │   └── slider_quality: QSlider
 │   │
 │   ├── Rembg Group (QGroupBox)
 │   │   ├── chk_rembg: QCheckBox
-│   │   └── combo_model: QComboBox (u2net_human_seg, u2net)
+│   │   └── combo_model: QComboBox
 │   │
-│   ├── Crop Group (QGroupBox)
-│   │   └── chk_crop: QCheckBox
-│   │
-│   ├── Resize Group (QGroupBox)
-│   │   ├── radio_w / radio_h / radio_wh: QRadioButton
-│   │   ├── spin_width / spin_height: QSpinBox
-│   │   └── slider_quality: QSlider
-│   │
-│   ├── Watermark Group (QGroupBox) ← NEW v1.1.0
-│   │   ├── chk_logo: QCheckBox
-│   │   │   ├── logo_path_edit: QLineEdit
-│   │   │   ├── btn_logo_select: QPushButton
-│   │   │   ├── btn_logo_clear: QPushButton
-│   │   │   └── logo_size_slider: QSlider (5-80%)
-│   │   │
-│   │   ├── chk_text: QCheckBox
-│   │   │   ├── text_edit: QLineEdit
-│   │   │   └── text_size_spin: QSpinBox (8-200px)
-│   │   │
-│   │   └── Shared Controls
-│   │       ├── combo_position: QComboBox (9 positions)
-│   │       ├── slider_opacity: QSlider (1-100%)
-│   │       └── spin_padding: QSpinBox (0-500px)
-│   │
-│   └── Output Group (QGroupBox)
-│       └── Quality slider (10-100%)
+│   ├── progress: QProgressBar
+│   └── btn_resize: QPushButton ("Convert")
 │
-└── Bottom Panel (QWidget)
-    ├── btn_start: QPushButton ("Bat dau")
-    ├── progress_bar: QProgressBar
-    └── status_label: QLabel
+└── Column 3: Watermarks (QWidget)
+    ├── Logo Group (QGroupBox)
+    │   ├── chk_logo: QCheckBox
+    │   ├── logo_path_edit: QLineEdit
+    │   ├── btn_logo_select: QPushButton
+    │   ├── btn_logo_clear: QPushButton
+    │   ├── combo_logo_position: QComboBox (9 positions)
+    │   ├── logo_opacity_slider: QSlider (1-100%)
+    │   ├── logo_size_slider: QSlider (5-80%)
+    │   └── spin_logo_padding: QSpinBox (0-500px)
+    │
+    └── Text Watermark Group (QGroupBox)
+        ├── chk_text: QCheckBox
+        ├── text_edit: QLineEdit
+        ├── combo_wm_text_position: QComboBox (9 positions)
+        ├── wm_text_opacity_slider: QSlider (1-100%)
+        ├── spin_wm_font_size: QSpinBox (8-200px)
+        ├── spin_wm_text_padding: QSpinBox (0-500px)
+        ├── spin_wm_rotation: QSpinBox (0-360°) ← NEW
+        └── chk_wm_tiling: QCheckBox ← NEW
 ```
 
 **UI Patterns:**
@@ -140,13 +168,22 @@ MainWindow
 1. **Enable/Disable Controls:**
 ```python
 self.chk_logo.toggled.connect(lambda checked:
-    self.logo_controls.setEnabled(checked)
+    self.logo_group_controls.setEnabled(checked)
+)
+self.chk_text.toggled.connect(lambda checked:
+    self.text_group_controls.setEnabled(checked)
 )
 ```
 
-2. **Auto-Save Config:**
+2. **Auto-Save Config (per section):**
 ```python
-self.slider_opacity.valueChanged.connect(self._save_wm_config)
+# Logo section auto-save
+self.logo_opacity_slider.valueChanged.connect(self._save_logo_config)
+self.logo_size_slider.valueChanged.connect(self._save_logo_config)
+
+# Text section auto-save
+self.wm_text_opacity_slider.valueChanged.connect(self._save_wm_config)
+self.spin_wm_rotation.valueChanged.connect(self._save_wm_config)
 ```
 
 3. **File Dialog:**
@@ -155,6 +192,14 @@ path, _ = QFileDialog.getOpenFileName(
     self, "Select Logo",
     filter="Images (*.png *.webp *.jpg *.jpeg)"
 )
+```
+
+4. **3-Column Layout:**
+```python
+layout = QHBoxLayout()
+layout.addLayout(col1, 1)  # File list
+layout.addLayout(col2, 1)  # Preview + basic controls
+layout.addLayout(col3, 1)  # Watermarks
 ```
 
 ### 2. Business Logic Layer (Worker Thread)
@@ -172,7 +217,9 @@ path, _ = QFileDialog.getOpenFileName(
 ```python
 def run(self):
     # 1. Cache logo (once per batch)
-    self.logo_img = Image.open(self.logo_path).convert("RGBA") if self.logo_path else None
+    wm_logo_img = None
+    if self.wm_logo_path and os.path.exists(self.wm_logo_path):
+        wm_logo_img = Image.open(self.wm_logo_path).convert("RGBA")
 
     for i, fpath in enumerate(image_files):
         # 2. Load image
@@ -180,123 +227,154 @@ def run(self):
 
         # 3. Rembg (optional)
         if self.use_rembg:
-            img = rembg.remove(img, session=self.rembg_session)
+            from rembg import remove
+            img = remove(img)
 
         # 4. Auto-crop (optional)
-        if self.use_crop:
-            img = img.crop(img.getbbox())
+        if self.crop_border > 0:
+            img = img.crop(...)
 
-        # 5. Watermark (optional) ← NEW v1.1.0
-        if self.logo_img or self.text_content:
+        # 5. Watermark (optional) ← v1.2.0 Enhanced
+        if wm_logo_img or self.wm_text_content:
             img = apply_watermark(
-                img, self.logo_img, self.logo_size_pct,
-                self.text_content, self.font_size,
-                self.position, self.opacity, self.padding
+                img,
+                logo_img=wm_logo_img,
+                text=self.wm_text_content,
+                logo_position=self.logo_position,
+                logo_size_pct=self.logo_size_pct,
+                logo_opacity_pct=self.logo_opacity_pct,
+                logo_padding=self.logo_padding,
+                text_position=self.text_position,
+                font_size=self.font_size,
+                text_opacity_pct=self.text_opacity_pct,
+                text_padding=self.text_padding,
+                text_rotation=self.text_rotation,  # NEW
+                text_tiling=self.text_tiling,      # NEW
             )
 
         # 6. Resize
-        img = img.resize((target_w, target_h), Image.LANCZOS)
+        w, h = calc_resize(img.width, img.height, ...)
+        resized = img.resize((w, h), Image.LANCZOS)
 
         # 7. Save WebP
-        img.save(output_path, "WEBP", quality=self.quality)
+        resized.save(output_path, "WEBP", quality=self.quality)
 
         # 8. Emit progress
-        self.progress.emit(int((i + 1) / total * 100))
+        self.progress.emit(i + 1)
 ```
 
 **Watermark Module (Pure Functions)**
 
 ```python
-def apply_watermark(
-    img: Image.Image,
-    logo_img: Image.Image | None,
-    logo_size_pct: int,
-    text_content: str,
-    font_size: int,
-    position: str,
-    opacity: int,
-    padding: int
-) -> Image.Image:
+def apply_watermark(img, logo_img=None, text=None,
+                    # Logo params (independent)
+                    logo_position='bottom-right', logo_size_pct=20,
+                    logo_opacity_pct=50, logo_padding=10,
+                    # Text params (independent)
+                    text_position='bottom-right', font_size=24,
+                    text_opacity_pct=50, text_padding=10,
+                    # New params v1.2.0
+                    text_rotation=0, text_tiling=False):
     """
-    Apply logo and/or text watermark to image.
+    Apply logo and/or text watermark to image with independent controls.
 
     Pure function: No side effects, returns new image.
 
-    Stacking: If both logo and text enabled at same position,
-              stack vertically (logo on top, 5px gap).
+    v1.2.0 Changes:
+    - Logo and text have fully independent position, opacity, padding
+    - Text rotation: 0-360 degrees (clockwise)
+    - Text tiling: Repeat text across entire image in diagonal pattern
+    - No stacking behavior (logo and text can overlap)
     """
 
-    # Helper: Calculate anchor point for 9-position grid
-    def _calc_anchor(container_size, element_size, position, padding):
-        w, h = container_size
-        ew, eh = element_size
+    if not logo_img and not text:
+        return img
 
-        # Position mapping
+    from PIL import ImageDraw, ImageFont
+
+    # Helper: Calculate anchor point for 9-position grid
+    def _calc_anchor(element_w, element_h, img_w, img_h, position, padding):
+        # Position mapping for 9-grid layout
         if position in ["top-left", "middle-left", "bottom-left"]:
             x = padding
         elif position in ["top-center", "center", "bottom-center"]:
-            x = (w - ew) // 2
+            x = (img_w - element_w) // 2
         else:  # right
-            x = w - ew - padding
+            x = img_w - element_w - padding
 
         if position in ["top-left", "top-center", "top-right"]:
             y = padding
         elif position in ["middle-left", "center", "middle-right"]:
-            y = (h - eh) // 2
+            y = (img_h - element_h) // 2
         else:  # bottom
-            y = h - eh - padding
+            y = img_h - element_h - padding
 
         return (max(0, x), max(0, y))
 
     # Helper: Adjust opacity
-    def _adjust_opacity(img, opacity_pct):
-        alpha = img.getchannel("A")
-        alpha = alpha.point(lambda p: int(p * opacity_pct / 100))
-        img.putalpha(alpha)
-        return img
+    def _adjust_opacity(layer, opacity_pct):
+        if opacity_pct >= 100:
+            return layer  # Optimization
+        r, g, b, a = layer.split()
+        a = a.point(lambda p: int(p * opacity_pct / 100))
+        return Image.merge("RGBA", (r, g, b, a))
 
-    # Process logo
+    # Process logo (independent positioning)
     if logo_img:
         logo_w = int(img.width * logo_size_pct / 100)
         logo_h = int(logo_img.height * logo_w / logo_img.width)
         logo_resized = logo_img.resize((logo_w, logo_h), Image.LANCZOS)
-        logo_resized = _adjust_opacity(logo_resized, opacity)
+        logo_resized = _adjust_opacity(logo_resized, logo_opacity_pct)
 
-        logo_pos = _calc_anchor(img.size, logo_resized.size, position, padding)
+        logo_pos = _calc_anchor(logo_w, logo_h, img.width, img.height,
+                                 logo_position, logo_padding)
         img.paste(logo_resized, logo_pos, logo_resized)
 
-    # Process text
-    if text_content:
-        from PIL import ImageDraw, ImageFont
-
+    # Process text (independent positioning, rotation, tiling)
+    if text:
         # Font fallback chain
         try:
             font = ImageFont.truetype("arial.ttf", font_size)
-        except:
+        except OSError:
             try:
                 font = ImageFont.truetype("DejaVuSans.ttf", font_size)
-            except:
+            except OSError:
                 font = ImageFont.load_default()
 
         # Calculate text size
         draw = ImageDraw.Draw(img)
-        bbox = draw.textbbox((0, 0), text_content, font=font)
-        text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
+        bbox = draw.textbbox((0, 0), text, font=font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
 
-        # Adjust position if stacking with logo
-        text_pos = _calc_anchor(img.size, (text_w, text_h), position, padding)
-        if logo_img:
-            # Stack text below logo (5px gap)
-            text_pos = (text_pos[0], logo_pos[1] + logo_h + 5)
+        # Create text layer
+        text_img = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+        text_draw = ImageDraw.Draw(text_img)
+        text_draw.text((0, 0), text, fill=(255, 255, 255, 255), font=font)
 
-        # Draw text with opacity
-        text_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-        draw_layer = ImageDraw.Draw(text_layer)
-        draw_layer.text(text_pos, text_content, fill=(255, 255, 255, 255), font=font)
-        text_layer = _adjust_opacity(text_layer, opacity)
+        # Apply rotation
+        if text_rotation != 0:
+            text_img = text_img.rotate(-text_rotation, expand=True,
+                                       fillcolor=(0, 0, 0, 0))
+            tw, th = text_img.size
 
-        img = Image.alpha_composite(img, text_layer)
+        # Apply opacity
+        text_img = _adjust_opacity(text_img, text_opacity_pct)
+
+        if text_tiling:
+            # Tile text across image with 2x spacing
+            tile_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+            step_x = int(tw * 2)
+            step_y = int(th * 2)
+            for y in range(-step_y, img.height, step_y):
+                for x in range(-step_x, img.width, step_x):
+                    tile_layer.paste(text_img, (x, y), text_img)
+            img = Image.alpha_composite(img, tile_layer)
+        else:
+            # Single text placement at specified position
+            text_pos = _calc_anchor(tw, th, img.width, img.height,
+                                     text_position, text_padding)
+            img.paste(text_img, text_pos, text_img)
 
     return img
 ```
@@ -311,24 +389,38 @@ def apply_watermark(
 - Validate config values (paths, ranges, keys)
 - Provide defaults for missing keys
 
-**Config Schema v1.1.0:**
+**Config Schema v1.2.0:**
 
 ```json
 {
-  "input_dir": "E:\\Images\\Input",
   "output_dir": "E:\\Images\\Output",
   "rembg_model": "u2net_human_seg",
+
   "wm_logo_enabled": false,
   "wm_logo_path": "E:\\Logos\\brand.png",
-  "wm_logo_size_pct": 15,
+  "logo_position": "bottom-right",
+  "logo_opacity": 50,
+  "logo_size_pct": 20,
+  "logo_padding": 10,
+
   "wm_text_enabled": true,
   "wm_text_content": "© 2026 Brand",
+  "wm_text_position": "top-center",
+  "wm_text_opacity": 80,
   "wm_font_size": 24,
-  "wm_position": "bottom-right",
-  "wm_opacity": 80,
-  "wm_padding": 20
+  "wm_text_padding": 10,
+  "wm_rotation": 45,
+  "wm_tiling": false
 }
 ```
+
+**Schema Changes from v1.1.0:**
+- Separated logo and text positions (was shared `wm_position`)
+- Separated logo and text opacity (was shared `wm_opacity`)
+- Separated logo and text padding (was shared `wm_padding`)
+- Added `wm_rotation` (0-360 degrees)
+- Added `wm_tiling` (boolean)
+- Total keys: 17 (was 12 in v1.1.0)
 
 **Functions:**
 
@@ -341,31 +433,65 @@ def load_config() -> dict:
     except:
         return {}
 
+def safe_config_int(cfg, key, default, min_val=None, max_val=None):
+    """Safely load integer from config with type and range validation."""
+    try:
+        val = int(cfg.get(key, default))
+        if min_val is not None and val < min_val:
+            return default
+        if max_val is not None and val > max_val:
+            return default
+        return val
+    except (ValueError, TypeError):
+        return default
+
+def safe_config_str(cfg, key, default, valid_values=None):
+    """Safely load string from config with validation."""
+    val = cfg.get(key, default)
+    if not isinstance(val, str):
+        return default
+    if valid_values and val not in valid_values:
+        return default
+    return val
+
 def save_config(config: dict) -> None:
-    """Save config to JSON, show error message on failure."""
+    """Save config to JSON, log warning on failure."""
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
     except Exception as e:
-        QMessageBox.critical(None, "Error", f"Failed to save config: {e}")
+        print(f"[WARN] Failed to save config: {e}")
 ```
 
 **Validation on Load:**
 
 ```python
-# Validate logo path
-logo_path = config.get("wm_logo_path", "")
+# Validate logo path with type check
+logo_path = safe_config_str(config, "wm_logo_path", "")
 if logo_path and not os.path.exists(logo_path):
     logo_path = ""  # Clear invalid path
 
-# Validate position key
-position = config.get("wm_position", "bottom-right")
-if position not in WM_POS_KEYS:
-    position = "bottom-right"
+# Validate position keys with whitelist
+logo_position = safe_config_str(config, "logo_position", "bottom-right",
+                                 valid_values=WM_POS_KEYS)
+text_position = safe_config_str(config, "wm_text_position", "bottom-right",
+                                 valid_values=WM_POS_KEYS)
 
-# Restore UI controls
+# Validate numeric ranges
+logo_opacity = safe_config_int(config, "logo_opacity", 50, 1, 100)
+logo_size_pct = safe_config_int(config, "logo_size_pct", 20, 5, 80)
+rotation = safe_config_int(config, "wm_rotation", 0, 0, 360)
+
+# Validate boolean with type check
+tiling = config.get("wm_tiling", False)
+if not isinstance(tiling, bool):
+    tiling = False
+
+# Restore UI controls safely
 self.logo_path_edit.setText(logo_path)
-self.combo_position.setCurrentIndex(WM_POS_KEYS.index(position))
+self.logo_opacity_slider.setValue(logo_opacity)
+self.spin_wm_rotation.setValue(rotation)
+self.chk_wm_tiling.setChecked(tiling)
 ```
 
 ## Threading Model
@@ -728,6 +854,27 @@ logging.error(f"Failed to load {fpath}: {e}")
 - Export to CSV for analysis
 
 ## Version History
+
+### v1.2.0 (2026-02-11) - UI Redesign & Enhanced Watermarks
+
+**Added:**
+- 3-column UI layout (file list | preview/basic | watermarks)
+- Independent logo controls (position, opacity, size, padding)
+- Independent text watermark controls (position, opacity, font, padding, rotation, tiling)
+- Text rotation feature (0-360 degrees, clockwise)
+- Text tiling mode (repeat across entire image)
+- Config validation helpers (`safe_config_int`, `safe_config_str`)
+- File size limit for input images (100MB max)
+- Worker restart guard to prevent memory leaks
+
+**Modified:**
+- `MainWindow`: Restructured from 2-column to 3-column layout
+- `apply_watermark()`: Added independent controls and new features (rotation, tiling)
+- `ResizeWorker`: Added 12 watermark parameters (was 7)
+- Config schema: Extended to 17 keys (was 12)
+- Minimum window size: 1100x600 (was flexible)
+
+**Files Changed:** 1 (resize-webp.py: +376 lines → 976 LOC total)
 
 ### v1.1.0 (2026-02-10) - Watermark Feature
 
