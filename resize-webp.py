@@ -228,7 +228,7 @@ class ResizeWorker(QThread):
 
     def __init__(self, files, target_w, target_h, quality, output_dir,
                  same_as_input, use_max_size, max_size, rembg_fn=None,
-                 model_name="u2net", crop_pct=0,
+                 model_name="u2net", crop_pct=0, auto_crop_white=False, white_tolerance=10,
                  # Output format and size mode
                  output_format="webp", keep_original=False,
                  # Watermark params
@@ -249,6 +249,8 @@ class ResizeWorker(QThread):
         self.rembg_fn = rembg_fn
         self.model_name = model_name
         self.crop_pct = crop_pct
+        self.auto_crop_white = auto_crop_white
+        self.white_tolerance = white_tolerance
         self.output_format = output_format.lower()
         self.keep_original = keep_original
         self.wm_logo_path = wm_logo_path
@@ -308,6 +310,20 @@ class ResizeWorker(QThread):
                     dx = int(cw * self.crop_pct / 200)
                     dy = int(ch * self.crop_pct / 200)
                     img = img.crop((dx, dy, cw - dx, ch - dy))
+
+                # Auto crop white border
+                if self.auto_crop_white:
+                    from PIL import ImageChops
+                    # Create white background reference, find content bounds
+                    bg = Image.new("RGB", img.size, (255, 255, 255))
+                    rgb_img = img.convert("RGB")
+                    diff = ImageChops.difference(rgb_img, bg)
+                    # Apply tolerance: pixels with diff <= tolerance are considered white
+                    if self.white_tolerance > 0:
+                        diff = diff.point(lambda p: 0 if p <= self.white_tolerance else p)
+                    bbox = diff.getbbox()
+                    if bbox:
+                        img = img.crop(bbox)
 
                 # Apply watermark (before resize)
                 if wm_logo_img or self.wm_text:
@@ -516,6 +532,21 @@ class MainWindow(QMainWindow):
         self.spin_crop.setSuffix("%")
         crop_layout.addWidget(self.spin_crop)
         col2.addLayout(crop_layout)
+
+        # Auto crop white border
+        auto_crop_layout = QHBoxLayout()
+        self.chk_auto_crop_white = QCheckBox("Auto crop viền trắng")
+        self.chk_auto_crop_white.setChecked(self.cfg.get("auto_crop_white", False))
+        self.chk_auto_crop_white.toggled.connect(self._save_auto_crop_config)
+        auto_crop_layout.addWidget(self.chk_auto_crop_white)
+        self.spin_white_tolerance = QSpinBox()
+        self.spin_white_tolerance.setRange(0, 50)
+        self.spin_white_tolerance.setValue(safe_config_int(self.cfg, "white_tolerance", 10, 0, 50))
+        self.spin_white_tolerance.setPrefix("Tolerance: ")
+        self.spin_white_tolerance.setToolTip("Ngưỡng nhận diện trắng (0=trắng tuyệt đối, cao hơn=rộng hơn)")
+        self.spin_white_tolerance.valueChanged.connect(self._save_auto_crop_config)
+        auto_crop_layout.addWidget(self.spin_white_tolerance)
+        col2.addLayout(auto_crop_layout)
 
         # Quality slider
         q_layout = QHBoxLayout()
@@ -1063,6 +1094,11 @@ class MainWindow(QMainWindow):
         self.spin_wm_rotation.setEnabled(enabled)
         self.chk_wm_tiling.setEnabled(enabled)
 
+    def _save_auto_crop_config(self):
+        self.cfg["auto_crop_white"] = self.chk_auto_crop_white.isChecked()
+        self.cfg["white_tolerance"] = self.spin_white_tolerance.value()
+        save_config(self.cfg)
+
     def _save_text_wm_config(self):
         self.cfg["wm_text_enabled"] = self.chk_text_wm.isChecked()
         self.cfg["wm_text_content"] = self.wm_text_edit.text()
@@ -1131,6 +1167,7 @@ class MainWindow(QMainWindow):
             self.quality_slider.value(), output_dir, same_as_input,
             use_max, self.spin_max.value(), rembg_fn,
             self.combo_model.currentText(), self.spin_crop.value(),
+            self.chk_auto_crop_white.isChecked(), self.spin_white_tolerance.value(),
             # Output format and size mode
             output_format=output_format,
             keep_original=keep_original,
