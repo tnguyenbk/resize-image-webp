@@ -37,31 +37,27 @@ Tool chuyển đổi và xử lý ảnh hàng loạt với tính năng đính lo
 - **Hệ điều hành**: Windows, macOS, Linux
 - **RAM**: Tối thiểu 2GB (khuyến nghị 4GB+ cho xử lý ảnh lớn)
 
-## Cài đặt
+## Cài đặt nhanh
 
-### 1. Cài đặt Python
-Tải và cài đặt Python từ [python.org](https://www.python.org/downloads/)
+> Yêu cầu: [Python 3.8+](https://www.python.org/downloads/) đã cài sẵn.
 
-### 2. Cài đặt dependencies
+Mở terminal (Command Prompt / PowerShell / Terminal) và chạy:
 
 ```bash
-# Cài đặt các thư viện cơ bản (bắt buộc)
+git clone https://github.com/tnguyenbk/resize-image-webp.git
+cd resize-image-webp
 pip install -r requirements.txt
-
-# Cài đặt rembg cho tính năng xóa nền
-# Chọn 1 trong 2:
-
-# CPU only (nhẹ hơn)
-pip install rembg[cpu]
-
-# GPU support (nhanh hơn, cần NVIDIA GPU + CUDA)
-pip install rembg[gpu]
+python resize-webp.py
 ```
 
-### 3. Chạy ứng dụng
+### Bật tính năng xóa nền (tùy chọn)
 
 ```bash
-python resize-webp.py
+# CPU only (nhẹ, phù hợp đa số máy)
+pip install "rembg[cpu]"
+
+# Hoặc GPU (nhanh hơn, cần NVIDIA GPU + CUDA)
+pip install "rembg[gpu]"
 ```
 
 ## Hướng dẫn sử dụng
