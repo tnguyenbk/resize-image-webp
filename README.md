@@ -2,6 +2,8 @@
 
 Tool chuyển đổi và xử lý ảnh hàng loạt với tính năng đính logo + watermark.
 
+![Screenshot](screenshot.jpg)
+
 ## Tính năng
 
 ### Xử lý ảnh cơ bản
