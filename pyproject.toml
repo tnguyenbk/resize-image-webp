@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resize-image-webp"
+version = "2.0.0"
+description = "PyQt5 batch image processor: resize, watermark, background removal, WebP conversion"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [{ name = "tnguyenbk" }]
+keywords = ["image", "resize", "webp", "watermark", "batch", "rembg", "background-removal"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Graphics",
+]
+dependencies = [
+    "PyQt5>=5.15.0",
+    "Pillow>=10.0.0",
+    "onnxruntime>=1.15.0",
+    "rembg>=2.0.0",
+]
+
+[project.optional-dependencies]
+cpu = ["rembg[cpu]"]
+gpu = ["rembg[gpu]"]
+
+[project.urls]
+Homepage = "https://github.com/tnguyenbk/resize-image-webp"
+
+[project.scripts]
+resize-webp = "resize_webp:main"
+
+[tool.setuptools]
+py-modules = ["resize_webp"]

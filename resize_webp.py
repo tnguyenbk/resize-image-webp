@@ -15,7 +15,7 @@ from PIL import Image
 
 SUPPORTED_EXTS = {".webp", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".gif"}
 FILTER_STR = "Images (" + " ".join(f"*{e}" for e in sorted(SUPPORTED_EXTS)) + ")"
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resize-webp-config.json")
+CONFIG_PATH = os.path.join(os.getcwd(), "resize-webp-config.json")
 
 WATERMARK_POSITIONS = [
     "Top-left", "Top-center", "Top-right",
@@ -1211,9 +1211,9 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Kết quả", msg)
 
 
-if __name__ == "__main__":
+def main():
     # Fix DLL search path for onnxruntime on Windows
-    import os, site
+    import site
     ort_dll_dir = os.path.join(site.getsitepackages()[0], "onnxruntime", "capi")
     if os.path.isdir(ort_dll_dir):
         os.environ["PATH"] = ort_dll_dir + os.pathsep + os.environ.get("PATH", "")
@@ -1233,3 +1233,7 @@ if __name__ == "__main__":
     window._rembg_remove = _rembg_remove
     window.show()
     sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()

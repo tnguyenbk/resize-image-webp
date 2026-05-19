@@ -41,23 +41,28 @@ Tool chuyển đổi và xử lý ảnh hàng loạt với tính năng đính lo
 
 > Yêu cầu: [Python 3.8+](https://www.python.org/downloads/) đã cài sẵn.
 
-Mở terminal (Command Prompt / PowerShell / Terminal) và chạy:
+```bash
+pip install resize-image-webp
+resize-webp
+```
+
+### Cài từ source
 
 ```bash
 git clone https://github.com/tnguyenbk/resize-image-webp.git
 cd resize-image-webp
-pip install -r requirements.txt
-python resize-webp.py
+pip install .
+resize-webp
 ```
 
 ### Bật tính năng xóa nền (tùy chọn)
 
 ```bash
 # CPU only (nhẹ, phù hợp đa số máy)
-pip install "rembg[cpu]"
+pip install "resize-image-webp[cpu]"
 
 # Hoặc GPU (nhanh hơn, cần NVIDIA GPU + CUDA)
-pip install "rembg[gpu]"
+pip install "resize-image-webp[gpu]"
 ```
 
 ## Hướng dẫn sử dụng
