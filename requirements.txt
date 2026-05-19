@@ -1,0 +1,18 @@
+# Core GUI framework
+PyQt5>=5.15.0
+
+# Image processing
+Pillow>=10.0.0
+
+# Background removal (optional but recommended)
+# Choose one of the following:
+# - For CPU only: pip install rembg[cpu]
+# - For GPU support: pip install rembg[gpu]
+rembg>=2.0.0
+
+# ONNX Runtime for rembg
+# Choose one based on your system:
+# - CPU only (default):
+onnxruntime>=1.15.0
+# - GPU (CUDA) - uncomment if you have NVIDIA GPU:
+# onnxruntime-gpu>=1.15.0
