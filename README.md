@@ -57,6 +57,8 @@ pip install .
 resize-webp
 ```
 
+> **Lưu ý:** Không chạy `python resize_webp.py` trực tiếp — hãy dùng `pip install .` để cài đầy đủ dependencies.
+
 ### Bật tính năng xóa nền (tùy chọn)
 
 ```bash
