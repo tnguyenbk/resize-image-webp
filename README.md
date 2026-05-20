@@ -48,26 +48,19 @@ pip install resize-image-webp
 resize-webp
 ```
 
-### Cài từ source
+### Cài từ source (kèm xóa nền)
 
 ```bash
 git clone https://github.com/tnguyenbk/resize-image-webp.git
 cd resize-image-webp
 pip install .
+pip install "rembg[cpu]"
 resize-webp
 ```
 
-> **Lưu ý:** Không chạy `python resize_webp.py` trực tiếp — hãy dùng `pip install .` để cài đầy đủ dependencies.
+> **Lưu ý:** Nếu `pip` không nhận, thử `py -m pip` thay cho `pip`. Không chạy `python resize_webp.py` trực tiếp.
 
-### Bật tính năng xóa nền (tùy chọn)
-
-```bash
-# CPU only (nhẹ, phù hợp đa số máy)
-pip install "resize-image-webp[cpu]"
-
-# Hoặc GPU (nhanh hơn, cần NVIDIA GPU + CUDA)
-pip install "resize-image-webp[gpu]"
-```
+> Nếu có NVIDIA GPU và muốn xóa nền nhanh hơn, thay `rembg[cpu]` bằng `rembg[gpu]`.
 
 ## Hướng dẫn sử dụng
 
